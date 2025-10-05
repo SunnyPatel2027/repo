@@ -875,3 +875,432 @@ class MyApp extends StatelessWidget {
   device_info_plus:
   loading_animation_widget: ^1.3.0
 ------------------------------------------------------------------------------------------------------------------------------------
+
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/material.dart';
+import 'package:practical_two/features/test_strip/bloc/test_strip_state.dart';
+import 'package:practical_two/features/test_strip/domain/test_strip_model.dart';
+
+class TestStripCubit extends Cubit<TestStripState> {
+  TestStripCubit() : super(const TestStripState()) {
+    _loadParameters();
+  }
+
+  void _loadParameters() {
+    final parameters = [
+      TestStripParameter(
+        name: "Total Hardness",
+        unit: "ppm",
+        values: [0, 110, 250, 500, 1000],
+        colors: [
+          Colors.purple[100]!,
+          Colors.purple[300]!,
+          Colors.purple,
+          Colors.deepPurple,
+          Colors.deepPurple[900]!,
+        ],
+        selectedColor: Colors.purple[100],
+        selectedValue: 0,
+      ),
+      TestStripParameter(
+        name: "Total Chlorine",
+        unit: "ppm",
+        values: [0, 1, 3, 5, 10],
+        colors: [
+          Colors.yellow[200]!,
+          Colors.yellow,
+          Colors.green[200]!,
+          Colors.green,
+          Colors.teal,
+        ],
+        selectedColor: Colors.yellow[200],
+        selectedValue: 0,
+      ),
+      TestStripParameter(
+        name: "Free Chlorine",
+        unit: "ppm",
+        values: [0, 1, 2, 3, 5],
+        colors: [
+          Colors.blue[100]!,
+          Colors.lightBlue,
+          Colors.blue,
+          Colors.indigo,
+          Colors.indigo[900]!,
+        ],
+        selectedColor: Colors.blue[100]!,
+        selectedValue: 0,
+      ),
+      TestStripParameter(
+        name: "pH",
+        unit: "ppm",
+        values: [6.2, 6.8, 7.2, 7.8, 8.4],
+        colors: [
+          Colors.red[200]!,
+          Colors.red,
+          Colors.deepOrange,
+          Colors.orange,
+          Colors.brown,
+        ],
+        selectedColor: Colors.red[200],
+        selectedValue: 6.2,
+      ),
+      TestStripParameter(
+        name: "Total Alkalinity",
+        unit: "ppm",
+        values: [0, 40, 120, 180, 180],
+        colors: [
+          Colors.green[100]!,
+          Colors.green[300]!,
+          Colors.green,
+          Colors.teal,
+          Colors.teal[900]!,
+        ],
+        selectedColor: Colors.green[100]!,
+        selectedValue: 0,
+      ),
+      TestStripParameter(
+        name: "Cyanuric Acid",
+        unit: "ppm",
+        values: [0, 50, 100, 150, 300],
+        colors: [
+          Colors.grey[200]!,
+          Colors.blueGrey[200]!,
+          Colors.blueGrey,
+          Colors.blueGrey[700]!,
+          Colors.black,
+        ],
+        selectedColor: Colors.grey[200]!,
+        selectedValue: 0,
+      ),
+    ];
+
+    emit(state.copyWith(parameters: parameters));
+  }
+
+  /// On tap color block
+  void selectColor(int paramIndex, int colorIndex) {
+    final updated = List<TestStripParameter>.from(state.parameters);
+    final p = updated[paramIndex];
+    updated[paramIndex] = p.copyWith(
+      selectedValue: p.values[colorIndex],
+      selectedColor: p.colors[colorIndex],
+    );
+    emit(state.copyWith(parameters: updated));
+  }
+
+  /// On textfield change
+  void updateValue(int paramIndex, String input) {
+    final updated = List<TestStripParameter>.from(state.parameters);
+    final p = updated[paramIndex];
+    if (input.isEmpty) return;
+    final value = double.tryParse(input) ?? 0;
+    final idx = p.getClosestIndex(value);
+    updated[paramIndex] = p.copyWith(
+      selectedValue: p.values[idx],
+      selectedColor: p.colors[idx],
+    );
+    emit(state.copyWith(parameters: updated));
+  }
+}
+
+import 'package:equatable/equatable.dart';
+import 'package:practical_two/features/test_strip/domain/test_strip_model.dart';
+
+class TestStripState extends Equatable {
+  final List<TestStripParameter> parameters;
+  final bool isLoading;
+
+  const TestStripState({this.parameters = const [], this.isLoading = false});
+
+  TestStripState copyWith({
+    List<TestStripParameter>? parameters,
+    bool? isLoading,
+  }) {
+    return TestStripState(
+      parameters: parameters ?? this.parameters,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+
+  @override
+  List<Object?> get props => [parameters, isLoading];
+}
+
+
+import 'package:flutter/material.dart';
+
+class TestStripParameter {
+  final String name;
+  final String unit;
+  final List<dynamic> values;
+  final List<Color> colors;
+  dynamic selectedValue;
+  Color? selectedColor;
+
+  TestStripParameter({
+    required this.name,
+    required this.unit,
+    required this.values,
+    required this.colors,
+    this.selectedValue,
+    this.selectedColor,
+  });
+
+  int getClosestIndex(double input) {
+    double minDiff = double.infinity;
+    int index = 0;
+    for (int i = 0; i < values.length; i++) {
+      double diff = (values[i] - input).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        index = i;
+      }
+    }
+    return index;
+  }
+
+  TestStripParameter copyWith({dynamic selectedValue, Color? selectedColor}) {
+    return TestStripParameter(
+      name: name,
+      unit: unit,
+      values: values,
+      colors: colors,
+      selectedValue: selectedValue ?? this.selectedValue,
+      selectedColor: selectedColor ?? this.selectedColor,
+    );
+  }
+}
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:practical_two/features/test_strip/bloc/test_strip_cubit.dart';
+import 'package:practical_two/features/test_strip/bloc/test_strip_state.dart'
+    show TestStripState;
+import 'package:practical_two/features/test_strip/domain/test_strip_model.dart';
+
+class TestStripScreen extends StatelessWidget {
+  const TestStripScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => TestStripCubit(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            "Test Strip",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          centerTitle: false,
+        ),
+        body: BlocBuilder<TestStripCubit, TestStripState>(
+          builder: (context, state) {
+            final cubit = context.read<TestStripCubit>();
+            return Container(
+              padding: const EdgeInsets.all(8),
+              width: double.infinity,
+              child: ListView.builder(
+                itemCount: state.parameters.length,
+                itemBuilder: (context, index) {
+                  final param = state.parameters[index];
+                  return ParameterRow(
+                    parameter: param,
+                    index: index,
+                    onColorTap: (colorIndex) =>
+                        cubit.selectColor(index, colorIndex),
+                    onTextChange: (val) => cubit.updateValue(index, val),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class ParameterRow extends StatefulWidget {
+  final TestStripParameter parameter;
+  final Function(int) onColorTap;
+  final Function(String) onTextChange;
+  final int index;
+  const ParameterRow({
+    super.key,
+    required this.parameter,
+    required this.onColorTap,
+    required this.onTextChange,
+    required this.index,
+  });
+
+  @override
+  State<ParameterRow> createState() => _ParameterRowState();
+}
+
+class _ParameterRowState extends State<ParameterRow> {
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.parameter.selectedValue.toString(),
+    );
+    _focusNode = FocusNode();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final param = widget.parameter;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.only(
+              topLeft: widget.index == 0
+                  ? Radius.circular(8)
+                  : Radius.circular(0),
+              topRight: widget.index == 0
+                  ? Radius.circular(8)
+                  : Radius.circular(0),
+              bottomLeft: widget.index == 5
+                  ? Radius.circular(8)
+                  : Radius.circular(0),
+              bottomRight: widget.index == 5
+                  ? Radius.circular(8)
+                  : Radius.circular(0),
+            ),
+            border: Border(
+              top: widget.index == 0
+                  ? BorderSide(color: Colors.grey)
+                  : BorderSide.none,
+              left: BorderSide(color: Colors.grey),
+              right: BorderSide(color: Colors.grey),
+              bottom: widget.index == 5
+                  ? BorderSide(color: Colors.grey)
+                  : BorderSide.none,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 45),
+              Container(
+                width: 10,
+                height: 30,
+                color: param.selectedColor ?? Colors.grey,
+              ),
+              const SizedBox(height: 50),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "${param.name} (${param.unit})",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 80,
+                    height: 35,
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      keyboardType: TextInputType.number,
+                      onTapOutside: (_) => _focusNode.unfocus(),
+                      onChanged: widget.onTextChange,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: const BorderSide(color: Colors.blue),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(param.values.length, (i) {
+                  return GestureDetector(
+                    onTap: () => widget.onColorTap(i),
+                    child: Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: MediaQuery.of(context).size.width * 0.15,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: param.colors[i],
+                            border: Border.all(
+                              color: param.selectedValue == param.values[i]
+                                  ? Colors.black
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        Text(param.values[i].toString()),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 25),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+import 'package:flutter/material.dart';
+import 'package:practical_two/features/test_strip/presentation/test_strip_screen.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
+      home: TestStripScreen(),
+    );
+  }
+}
+
